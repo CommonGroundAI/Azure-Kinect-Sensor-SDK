@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     cv::Size chessboard_pattern(0, 0);   // height, width. Both need to be set.
     uint16_t depth_threshold = 1000;     // default to 1 meter
     size_t num_devices = 0;
-    double calibration_timeout = 60.0; // default to timing out after 60s of trying to get calibrated
+    double calibration_timeout = 300.0; // default to timing out after 300s of trying to get calibrated
     double greenscreen_duration = std::numeric_limits<double>::max(); // run forever
 
     vector<uint32_t> device_indices{ 0 }; // Set up a MultiDeviceCapturer to handle getting many synchronous captures
@@ -81,10 +81,16 @@ int main(int argc, char **argv)
              << endl;
 
         cerr << "Not enough arguments!\n";
-        exit(1);
+        //exit(1);
+
+        num_devices = 2;
+        chessboard_pattern.height = 9;
+        chessboard_pattern.width = 6;
+        chessboard_square_length = 25.0;
     }
     else
     {
+
         num_devices = static_cast<size_t>(atoi(argv[1]));
         if (num_devices > k4a::device::get_installed_count())
         {
@@ -94,6 +100,7 @@ int main(int argc, char **argv)
         chessboard_pattern.height = atoi(argv[2]);
         chessboard_pattern.width = atoi(argv[3]);
         chessboard_square_length = static_cast<float>(atof(argv[4]));
+        
 
         if (argc > 5)
         {
@@ -501,6 +508,8 @@ Transformation stereo_calibration(const k4a::calibration &main_calib,
                                        cv::CALIB_FIX_INTRINSIC | cv::CALIB_RATIONAL_MODEL | cv::CALIB_CB_FAST_CHECK);
     cout << "Finished calibrating!\n";
     cout << "Got error of " << error << "\n";
+    cout << "The rotation: " << tr.R << "\n";
+    cout << "The translation: " << tr.t << "\n";
     return tr;
 }
 
@@ -602,7 +611,15 @@ static Transformation calibrate_devices(MultiDeviceCapturer &capturer,
         cv::imshow("Chessboard view from secondary camera", cv_secondary_color_image);
         cv::waitKey(1);
 
+        k4a::image main_depth_image = main_capture.get_depth_image();
+
+        std::string master_file_name = "capture_master_" + std::to_string(main_chessboard_corners_list.size()) + ".jpg";
+        cv::imwrite(master_file_name, cv_main_color_image);
+        std::string subordinate_file_name = "capture_subordinate_" + std::to_string(main_chessboard_corners_list.size()) + ".jpg";
+        cv::imwrite(subordinate_file_name, cv_main_color_image);
+
         // Get 20 frames before doing calibration.
+        cout << "Got " << main_chessboard_corners_list.size() << " pairs of points so far.\n";
         if (main_chessboard_corners_list.size() >= 20)
         {
             cout << "Calculating calibration..." << endl;
